@@ -1,0 +1,21 @@
+<resources>
+    <string name="app_name">BLE Spam</string>
+    <string name="app_subtitle">Bluetooth Low Energy Testing Suite</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_broadcast">Broadcast</string>
+    <string name="nav_modes">Modes</string>
+    <string name="nav_advanced">Advanced</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Notifications -->
+    <string name="notification_channel_name">BLE Advertising</string>
+    <string name="notification_channel_desc">Shows when the app is broadcasting BLE advertisements.</string>
+    <string name="notification_advertising_title">BLE Spam is advertising</string>
+    <string name="notification_advertising_text">Broadcasting %1$s</string>
+
+    <!-- About -->
+    <string name="about_developer">BLE Spam Project</string>
+    <string name="about_license">Apache License 2.0</string>
+</resources>
