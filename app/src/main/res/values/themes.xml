@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Base application theme. The real UI is drawn by Compose; this theme
+         only controls the window background and system bars before Compose
+         takes over, so it must be edge-to-edge and translucent. -->
+    <style name="Theme.BleSpam" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/splash_bg</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="p">shortEdges</item>
+    </style>
+
+    <!-- Splash screen theme using the AndroidX SplashScreen API for a fast,
+         branded cold start. -->
+    <style name="Theme.BleSpam.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_bg</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_ble_logo</item>
+        <item name="windowSplashScreenIconBackgroundColor">@color/brand_indigo</item>
+        <item name="postSplashScreenTheme">@style/Theme.BleSpam</item>
+    </style>
+
+</resources>

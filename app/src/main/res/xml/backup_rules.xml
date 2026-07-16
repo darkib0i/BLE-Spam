@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Persist saved configurations and preferences across reinstalls,
+         but never back up transient cache. -->
+    <include domain="database" path="ble_spam.db" />
+    <include domain="sharedpref" path="." />
+</full-backup-content>

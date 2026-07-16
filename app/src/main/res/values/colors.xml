@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- A few base colors are needed by XML themes; the full palette lives
+         in the Compose theme (ui/theme/Color.kt). -->
+    <color name="black">#FF000000</color>
+    <color name="amoled_black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="brand_indigo">#FF6C5CE7</color>
+    <color name="brand_violet">#FF8E7BFF</color>
+    <color name="splash_bg">#FF07070B</color>
+</resources>
