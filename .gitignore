@@ -13,5 +13,6 @@ local.properties
 /build
 *.apk
 *.aab
+*.idsig
 *.keystore
 !debug.keystore
