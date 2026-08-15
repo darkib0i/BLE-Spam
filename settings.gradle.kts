@@ -20,5 +20,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "BLE Spam"
+rootProject.name = "Video Downloader"
 include(":app")

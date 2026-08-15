@@ -2,39 +2,35 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.ksp)
-    alias(libs.plugins.hilt)
 }
 
 android {
-    namespace = "com.blespam.app"
+    namespace = "com.videodownloader.app"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.blespam.app"
-        // Android 10 (API 29) is the minimum, per the "Support Android 10+"
-        // requirement. This is also the boundary where the runtime
-        // BLUETOOTH_SCAN / BLUETOOTH_ADVERTISE permission model changes,
-        // which the permission layer accounts for.
-        minSdk = 29
+        applicationId = "com.videodownloader.app"
+        // yt-dlp / python bundle from youtubedl-android needs API 24+.
+        minSdk = 24
         targetSdk = 35
         versionCode = 1
         versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
+
+        // The bundled binaries only ship for these ABIs. Filtering keeps the
+        // APK from advertising unsupported architectures.
+        ndk {
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64")
+        }
     }
 
     buildTypes {
         release {
-            // R8 full-mode shrinking keeps the APK small and the runtime lean,
-            // supporting the "minimal RAM / small footprint" requirement.
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            // R8 would strip the reflection youtubedl-android relies on, so
+            // shrinking stays off for this build to keep downloads working.
+            isMinifyEnabled = false
         }
         debug {
             applicationIdSuffix = ".debug"
@@ -65,6 +61,11 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+        // youtubedl-android ships its python/ffmpeg payload as .so files that
+        // must be extracted at install time rather than mmap'd from the APK.
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 }
 
@@ -84,25 +85,15 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.extended)
-    implementation(libs.androidx.navigation.compose)
     debugImplementation(libs.androidx.ui.tooling)
-
-    // Dependency injection
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.compiler)
-    implementation(libs.androidx.hilt.navigation.compose)
-
-    // Persistence
-    implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.room.ktx)
-    ksp(libs.androidx.room.compiler)
-    implementation(libs.androidx.datastore.preferences)
 
     // Async
     implementation(libs.kotlinx.coroutines.android)
 
-    // Runtime permissions helper for Compose
-    implementation(libs.accompanist.permissions)
+    // yt-dlp download engine (library + ffmpeg for merging + aria2c for speed)
+    implementation(libs.youtubedl.library)
+    implementation(libs.youtubedl.ffmpeg)
+    implementation(libs.youtubedl.aria2c)
 
     // Testing
     testImplementation(libs.junit)

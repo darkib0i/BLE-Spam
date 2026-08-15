@@ -1,25 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources xmlns:tools="http://schemas.android.com/tools">
+<resources>
 
-    <!-- Base application theme. The real UI is drawn by Compose; this theme
-         only controls the window background and system bars before Compose
-         takes over, so it must be edge-to-edge and translucent. -->
-    <style name="Theme.BleSpam" parent="android:Theme.Material.NoActionBar">
-        <item name="android:windowBackground">@color/splash_bg</item>
-        <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:navigationBarColor">@android:color/transparent</item>
+    <!-- Base application theme. Compose paints everything; this only needs to
+         provide a dark, edge-to-edge window with no system action bar. -->
+    <style name="Theme.VideoDownloader" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/night</item>
+        <item name="android:statusBarColor">@color/transparent</item>
+        <item name="android:navigationBarColor">@color/transparent</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
-        <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="p">shortEdges</item>
     </style>
 
-    <!-- Splash screen theme using the AndroidX SplashScreen API for a fast,
-         branded cold start. -->
-    <style name="Theme.BleSpam.Splash" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">@color/splash_bg</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_ble_logo</item>
-        <item name="windowSplashScreenIconBackgroundColor">@color/brand_indigo</item>
-        <item name="postSplashScreenTheme">@style/Theme.BleSpam</item>
+    <!-- Splash screen shown while the process starts (androidx core-splashscreen). -->
+    <style name="Theme.VideoDownloader.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/night</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="postSplashScreenTheme">@style/Theme.VideoDownloader</item>
     </style>
 
 </resources>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- The Movies folder inside the app's scoped external storage, where
+         finished downloads are written. -->
+    <external-files-path name="downloads" path="Movies/" />
+    <external-files-path name="audio" path="Music/" />
+</paths>

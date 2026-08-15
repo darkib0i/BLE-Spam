@@ -1,98 +1,59 @@
-# BLE Spam — Bluetooth Low Energy Testing Suite
+# Video Downloader
 
-A premium, flagship-styled Android application for **BLE development, debugging,
-interoperability testing and educational demonstrations**. Built from scratch
-with a clean MVVM architecture, Jetpack Compose, Material 3 and a heavy emphasis
-on a fluid, animated, glassmorphic user experience.
+A gorgeous, fully‑animated Android app that downloads videos from **any
+platform** — TikTok, YouTube, Instagram, X (Twitter), Facebook, Reddit and
+1,800+ other sites — at the **highest available quality**.
 
-> **Responsible use.** BLE Spam advertises *only* through the standard Android
-> `BluetoothLeAdvertiser` API and stays within the platform's own size, timing
-> and rate limits — it does **not** attempt to bypass any hardware, OS or
-> Bluetooth-specification restriction. Use it to test devices you own or are
-> authorised to test. Broadcasting to disrupt, deceive or harass people or
-> devices you do not control may be illegal.
-
----
+Built with 100% Jetpack Compose and powered on‑device by
+[`yt-dlp`](https://github.com/yt-dlp/yt-dlp) (via
+[youtubedl‑android](https://github.com/JunkFood02/youtubedl-android)) with a
+bundled `ffmpeg` for merging and `aria2c` for accelerated downloads.
 
 ## Features
 
-- **Home** — live system status: Bluetooth state, permissions (location / scan /
-  nearby devices), BLE support, adapter name and battery level, with a large
-  animated Start action.
-- **Control** — Start/Stop advertising, glowing live counters, a live throughput
-  graph, and session statistics (packets, sessions, elapsed time, mode, power,
-  interval, estimated battery usage).
-- **Modes** — ten advertising payload builders, from generic advertisements and
-  random manufacturer data to structural *interoperability-testing* formats for
-  Apple/Samsung/Google Fast Pair/Microsoft Swift Pair packet shapes, plus a
-  fully custom payload builder.
-- **Visual Payload Editor** — compose an advertisement field by field with a
-  live, color-coded hex preview and a running 31-byte legacy budget check.
-- **Advanced** — advertising history, saved configurations, favorites, JSON
-  export/import, aggregate statistics, and a full device / BLE capability report
-  including battery-optimization status.
-- **Settings** — theme (system/light/dark), accent color, Material You dynamic
-  color, AMOLED black, animation speed & toggle, battery saver, notifications,
-  developer options.
-- **About** — animated hero, version/developer/license/privacy, responsible-use
-  statement and open-source library credits.
+- **Any platform** — paste a link from virtually any video site and it just works.
+- **Top quality** — grabs the best video stream and merges it with the best
+  audio (4K/1080p when the source offers it). Presets for Best / 1080p / 720p /
+  audio‑only MP3.
+- **Insane animations** — a living aurora background, a shimmering neon title,
+  a rotating gradient progress ring with an animated percentage, a
+  confetti‑and‑checkmark success burst, a springy glass bottom bar, and
+  animated screen transitions throughout.
+- **Share‑to‑download** — share a link from another app straight into it.
+- **Library** — every download is listed with one‑tap open and share.
+- **No storage permission** — files are saved to the app's scoped storage and
+  opened/shared via a `FileProvider`.
 
-## Tech stack
+## Get the APK
 
-| Concern            | Choice                                   |
-|--------------------|------------------------------------------|
-| Language           | Kotlin                                   |
-| UI                 | Jetpack Compose + Material 3             |
-| Architecture       | MVVM (unidirectional data flow)          |
-| Async              | Coroutines + Flow                        |
-| DI                 | Hilt                                     |
-| Persistence        | Room + DataStore Preferences             |
-| Navigation         | Navigation Compose                       |
-| Min / Target SDK   | 29 (Android 10) / 35                      |
+You don't need Android Studio. Every push builds a debug APK in CI:
 
-## Architecture
+1. Open the repo's **Actions** tab → the latest **Build APK** run → download the
+   `video-downloader-debug` artifact, **or**
+2. Grab it from the **Releases** page (the rolling `latest` release).
 
-```
-com.blespam.app
-├── data/            Room entities, DAOs, mappers, repositories, DataStore
-├── domain/          BLE layer (advertiser, payload builder, environment),
-│                    device info, export, and pure Kotlin models
-├── di/              Hilt modules
-└── ui/              Compose theme, reusable components, per-screen ViewModels
-                     and screens (home, control, modes, advanced, settings, about)
-```
+Then on your Android phone: enable *Install unknown apps* for your browser/file
+manager and open the `.apk`.
 
-- `BleEnvironment` is the single, version-aware source of truth for Bluetooth
-  capabilities and runtime-permission state (handles the Android 10/11 vs 12+
-  permission split).
-- `BleAdvertiser` owns the radio lifecycle and exposes live `AdvertisingStats`
-  via a `StateFlow`; `AdvertisingController` shares session + config state across
-  screens and records history.
-- `PayloadBuilder` converts a configuration into a platform `AdvertiseData`,
-  validates it against the legacy size budget, and produces the editor's hex
-  preview.
+## Build it yourself
 
-## Building
-
-The project uses the Gradle wrapper. With the Android SDK installed
-(`ANDROID_HOME` / `local.properties` pointing at it):
+Requires the Android SDK (API 35) and JDK 17.
 
 ```bash
-./gradlew assembleDebug      # build a debug APK
-./gradlew installDebug       # build & install on a connected device
-./gradlew assembleRelease    # R8-shrunk release build
+./gradlew assembleDebug
+# output: app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Open the folder in Android Studio (Ladybug or newer) to build and run with a
-single click.
+## Tech
 
-## Supported devices
+| Area        | Choice                                            |
+|-------------|---------------------------------------------------|
+| Language    | Kotlin                                            |
+| UI          | Jetpack Compose + Material 3 (custom neon theme)   |
+| Download    | youtubedl‑android (yt‑dlp) + ffmpeg + aria2c       |
+| Min / Target| Android 7.0 (API 24) / Android 15 (API 35)         |
 
-Android 10+ phones and tablets, including Samsung, Google Pixel, Xiaomi,
-OnePlus, Nothing Phone and Motorola. BLE advertising availability ultimately
-depends on the device's Bluetooth chipset; the app detects and reports this at
-runtime and degrades gracefully when advertising isn't supported.
+## Responsible use
 
-## License
-
-Apache License 2.0 — see [LICENSE](LICENSE).
+Only download content you own or have permission to use. Respect each
+platform's Terms of Service and applicable copyright law.
