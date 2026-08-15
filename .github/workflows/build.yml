@@ -50,11 +50,15 @@ jobs:
           tag_name: latest
           name: Video Downloader (latest debug build)
           body: |
-            Auto-built debug APK of Video Downloader.
+            ## ⬇️ [Download the app (app-debug.apk)](https://github.com/darkib0i/BLE-Spam/releases/download/latest/app-debug.apk)
 
-            **Install on Android:** tap `app-debug.apk` below, then when the
-            browser warns about the file type, choose "Download anyway", and
-            open it. Enable "install unknown apps" for your browser if asked.
+            Tap the link above on your Android phone.
+
+            **On a phone:**
+            1. Tap the download link (or tap `app-debug.apk` in **Assets** below — *not* "Source code").
+            2. If Chrome says *"this type of file can harm your device"*, tap **Download anyway**.
+            3. Open the downloaded file and allow **install unknown apps** if asked.
+            4. Open it in a normal browser (Chrome/Safari), not inside TikTok/Instagram.
           files: app/build/outputs/apk/debug/*.apk
           prerelease: false
           make_latest: "true"
