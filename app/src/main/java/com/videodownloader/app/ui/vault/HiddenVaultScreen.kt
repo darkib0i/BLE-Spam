@@ -33,17 +33,24 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.InsertDriveFile
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.CreateNewFolder
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.InsertDriveFile
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.PlayCircle
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,13 +65,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.videodownloader.app.download.share.openFile
-import com.videodownloader.app.download.vault.VaultItem
+import com.videodownloader.app.download.vault.VaultEntry
 import com.videodownloader.app.download.vault.VaultManager
 import com.videodownloader.app.ui.theme.Cyan
 import com.videodownloader.app.ui.theme.NeonSweep
@@ -81,10 +89,17 @@ fun HiddenVaultScreen(
     viewModel: VaultViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    var viewing by remember { mutableStateOf<VaultItem?>(null) }
+    var viewing by remember { mutableStateOf<VaultEntry?>(null) }
+    var pendingDelete by remember { mutableStateOf<VaultEntry?>(null) }
+    var showNewFolder by remember { mutableStateOf(false) }
 
-    BackHandler(enabled = viewing != null) { viewing = null }
-    BackHandler(enabled = viewing == null) { onClose() }
+    BackHandler {
+        when {
+            viewing != null -> viewing = null
+            !state.atRoot -> viewModel.goUp()
+            else -> onClose()
+        }
+    }
 
     val mediaPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(30),
@@ -101,19 +116,27 @@ fun HiddenVaultScreen(
             .statusBarsPadding(),
     ) {
         Column(Modifier.fillMaxSize()) {
-            // Header.
+            // Header with breadcrumb + up/close.
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Rounded.Lock, null, tint = Cyan, modifier = Modifier.size(22.dp))
+                if (state.atRoot) {
+                    Icon(Icons.Rounded.Lock, null, tint = Cyan, modifier = Modifier.size(22.dp).padding(start = 4.dp))
+                } else {
+                    IconButton(onClick = { viewModel.goUp() }) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Up", tint = TextPrimary)
+                    }
+                }
                 Text(
-                    "  Private Vault",
+                    "  ${state.breadcrumb}",
                     color = TextPrimary,
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).padding(start = 4.dp),
                 )
                 IconButton(onClick = onClose) {
                     Icon(Icons.Rounded.Close, "Close", tint = TextSecondary)
@@ -121,52 +144,49 @@ fun HiddenVaultScreen(
             }
 
             Text(
-                "Files here are stored privately inside the app. You can delete the originals from your gallery and still view them here.",
+                "Private, in-app storage. Make folders, import from your gallery or files, and it all stays here even after you delete the originals.",
                 color = TextMuted,
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 2.dp),
             )
 
-            // Import actions.
+            // Import + folder actions.
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                ImportButton(
-                    text = "Gallery",
-                    icon = Icons.Rounded.PhotoLibrary,
-                    modifier = Modifier.weight(1f),
-                ) {
+                ActionButton("Gallery", Icons.Rounded.PhotoLibrary, Modifier.weight(1f)) {
                     mediaPicker.launch(
                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
                     )
                 }
-                ImportButton(
-                    text = "Files",
-                    icon = Icons.Rounded.Add,
-                    modifier = Modifier.weight(1f),
-                ) {
+                ActionButton("Files", Icons.Rounded.Add, Modifier.weight(1f)) {
                     filePicker.launch(arrayOf("*/*"))
+                }
+                ActionButton("Folder", Icons.Rounded.CreateNewFolder, Modifier.weight(1f)) {
+                    showNewFolder = true
                 }
             }
 
-            if (state.items.isEmpty()) {
-                EmptyVault()
+            if (state.entries.isEmpty()) {
+                EmptyState()
             } else {
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(3),
-                    contentPadding = PaddingValues(16.dp),
+                    contentPadding = PaddingValues(14.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    items(state.items, key = { it.file.absolutePath }) { item ->
+                    items(state.entries, key = { it.file.absolutePath }) { entry ->
                         VaultCell(
-                            item = item,
-                            onOpen = { viewing = item },
-                            onDelete = { viewModel.delete(item) },
+                            entry = entry,
+                            onOpen = {
+                                if (entry.isFolder) viewModel.openFolder(entry.file) else viewing = entry
+                            },
+                            onDelete = { pendingDelete = entry },
                         )
                     }
                 }
@@ -174,45 +194,70 @@ fun HiddenVaultScreen(
         }
 
         // Full-screen viewer.
-        AnimatedVisibility(
-            visible = viewing != null,
-            enter = fadeIn(),
-            exit = fadeOut(),
-        ) {
-            viewing?.let { item ->
-                VaultViewer(item = item, onClose = { viewing = null })
-            }
+        AnimatedVisibility(visible = viewing != null, enter = fadeIn(), exit = fadeOut()) {
+            viewing?.let { entry -> VaultViewer(entry = entry, onClose = { viewing = null }) }
         }
+    }
+
+    // New-folder dialog.
+    if (showNewFolder) {
+        NewFolderDialog(
+            onConfirm = { name ->
+                viewModel.createFolder(name)
+                showNewFolder = false
+            },
+            onDismiss = { showNewFolder = false },
+        )
+    }
+
+    // Delete confirmation.
+    pendingDelete?.let { entry ->
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text(if (entry.isFolder) "Delete folder?" else "Delete file?") },
+            text = {
+                Text(
+                    if (entry.isFolder)
+                        "\"${entry.name}\" and everything inside it will be permanently removed."
+                    else
+                        "\"${entry.name}\" will be permanently removed from the vault.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.delete(entry)
+                    pendingDelete = null
+                }) { Text("Delete", color = Pink) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDelete = null }) { Text("Cancel", color = TextSecondary) }
+            },
+        )
     }
 }
 
 @Composable
-private fun ImportButton(
+private fun ActionButton(
     text: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    Row(
+    Column(
         modifier
             .clip(RoundedCornerShape(18.dp))
             .background(Brush.horizontalGradient(NeonSweep))
             .clickable(onClick = onClick)
-            .padding(vertical = 14.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(icon, null, tint = Color.White, modifier = Modifier.size(20.dp))
-        Text("  $text", color = Color.White)
+        Icon(icon, null, tint = Color.White, modifier = Modifier.size(22.dp))
+        Text(text, color = Color.White, style = MaterialTheme.typography.labelSmall)
     }
 }
 
 @Composable
-private fun VaultCell(item: VaultItem, onOpen: () -> Unit, onDelete: () -> Unit) {
-    val thumb by produceState<Bitmap?>(initialValue = null, item) {
-        value = VaultManager.thumbnail(item)
-    }
-
+private fun VaultCell(entry: VaultEntry, onOpen: () -> Unit, onDelete: () -> Unit) {
     Box(
         Modifier
             .aspectRatio(1f)
@@ -220,39 +265,59 @@ private fun VaultCell(item: VaultItem, onOpen: () -> Unit, onDelete: () -> Unit)
             .background(Color.White.copy(alpha = 0.06f))
             .clickable(onClick = onOpen),
     ) {
-        val bmp = thumb
-        if (bmp != null) {
-            Image(
-                bitmap = bmp.asImageBitmap(),
-                contentDescription = item.displayName,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-        } else {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Icon(
-                    when (item.kind) {
-                        VaultItem.Kind.VIDEO -> Icons.Rounded.PlayCircle
-                        VaultItem.Kind.IMAGE -> Icons.Rounded.PhotoLibrary
-                        VaultItem.Kind.OTHER -> Icons.Rounded.InsertDriveFile
-                    },
-                    contentDescription = null,
-                    tint = TextMuted,
-                    modifier = Modifier.size(34.dp),
+        if (entry.isFolder) {
+            Column(
+                Modifier.fillMaxSize().padding(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Icon(Icons.Rounded.Folder, null, tint = Cyan, modifier = Modifier.size(46.dp))
+                Text(
+                    entry.name,
+                    color = TextPrimary,
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    "${entry.childCount} item${if (entry.childCount == 1) "" else "s"}",
+                    color = TextMuted,
+                    style = MaterialTheme.typography.labelSmall,
                 )
             }
-        }
-
-        // Play badge for videos.
-        if (item.kind == VaultItem.Kind.VIDEO && bmp != null) {
-            Icon(
-                Icons.Rounded.PlayCircle,
-                null,
-                tint = Color.White,
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .size(38.dp),
-            )
+        } else {
+            val thumb by produceState<Bitmap?>(initialValue = null, entry) {
+                value = VaultManager.thumbnail(entry)
+            }
+            val bmp = thumb
+            if (bmp != null) {
+                Image(
+                    bitmap = bmp.asImageBitmap(),
+                    contentDescription = entry.name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                if (entry.kind == VaultEntry.Kind.VIDEO) {
+                    Icon(
+                        Icons.Rounded.PlayCircle, null, tint = Color.White,
+                        modifier = Modifier.align(Alignment.Center).size(38.dp),
+                    )
+                }
+            } else {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(
+                        when (entry.kind) {
+                            VaultEntry.Kind.VIDEO -> Icons.Rounded.PlayCircle
+                            VaultEntry.Kind.IMAGE -> Icons.Rounded.PhotoLibrary
+                            else -> Icons.Rounded.InsertDriveFile
+                        },
+                        contentDescription = null,
+                        tint = TextMuted,
+                        modifier = Modifier.size(34.dp),
+                    )
+                }
+            }
         }
 
         // Delete affordance.
@@ -271,7 +336,7 @@ private fun VaultCell(item: VaultItem, onOpen: () -> Unit, onDelete: () -> Unit)
 }
 
 @Composable
-private fun VaultViewer(item: VaultItem, onClose: () -> Unit) {
+private fun VaultViewer(entry: VaultEntry, onClose: () -> Unit) {
     val context = LocalContext.current
     Box(
         Modifier
@@ -280,26 +345,26 @@ private fun VaultViewer(item: VaultItem, onClose: () -> Unit) {
             .statusBarsPadding()
             .navigationBarsPadding(),
     ) {
-        when (item.kind) {
-            VaultItem.Kind.IMAGE -> {
-                val bmp by produceState<Bitmap?>(initialValue = null, item) {
-                    value = VaultManager.thumbnail(item, targetPx = 1600)
+        when (entry.kind) {
+            VaultEntry.Kind.IMAGE -> {
+                val bmp by produceState<Bitmap?>(initialValue = null, entry) {
+                    value = VaultManager.thumbnail(entry, targetPx = 1600)
                 }
                 bmp?.let {
                     Image(
                         bitmap = it.asImageBitmap(),
-                        contentDescription = item.displayName,
+                        contentDescription = entry.name,
                         contentScale = ContentScale.Fit,
                         modifier = Modifier.fillMaxSize().padding(12.dp),
                     )
                 }
             }
-            VaultItem.Kind.VIDEO -> {
+            VaultEntry.Kind.VIDEO -> {
                 AndroidView(
                     modifier = Modifier.fillMaxSize().padding(8.dp),
                     factory = { ctx ->
                         VideoView(ctx).apply {
-                            setVideoURI(Uri.fromFile(item.file))
+                            setVideoURI(Uri.fromFile(entry.file))
                             val controller = MediaController(ctx)
                             controller.setAnchorView(this)
                             setMediaController(controller)
@@ -308,7 +373,7 @@ private fun VaultViewer(item: VaultItem, onClose: () -> Unit) {
                     },
                 )
             }
-            VaultItem.Kind.OTHER -> {
+            else -> {
                 Column(
                     Modifier.fillMaxSize(),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -316,11 +381,9 @@ private fun VaultViewer(item: VaultItem, onClose: () -> Unit) {
                 ) {
                     Icon(Icons.Rounded.InsertDriveFile, null, tint = TextSecondary, modifier = Modifier.size(72.dp))
                     Spacer(Modifier.height(12.dp))
-                    Text(item.displayName, color = TextPrimary, overflow = TextOverflow.Ellipsis)
+                    Text(entry.name, color = TextPrimary, overflow = TextOverflow.Ellipsis)
                     Spacer(Modifier.height(16.dp))
-                    ImportButton(text = "Open externally", icon = Icons.Rounded.Add) {
-                        openFile(context, item.file)
-                    }
+                    ActionButton("Open externally", Icons.Rounded.Add) { openFile(context, entry.file) }
                 }
             }
         }
@@ -335,17 +398,51 @@ private fun VaultViewer(item: VaultItem, onClose: () -> Unit) {
 }
 
 @Composable
-private fun EmptyVault() {
+private fun NewFolderDialog(onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
+    var name by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("New folder") },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                singleLine = true,
+                placeholder = { Text("Folder name", color = TextMuted) },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Cyan,
+                    unfocusedBorderColor = TextMuted,
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary,
+                    cursorColor = Cyan,
+                ),
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(name.trim()) },
+                enabled = name.isNotBlank(),
+            ) { Text("Create", color = Cyan) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel", color = TextSecondary) }
+        },
+    )
+}
+
+@Composable
+private fun EmptyState() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Rounded.Lock, null, tint = TextMuted, modifier = Modifier.size(56.dp))
+            Icon(Icons.Rounded.Folder, null, tint = TextMuted, modifier = Modifier.size(56.dp))
             Spacer(Modifier.height(12.dp))
-            Text("Vault is empty", color = TextSecondary, style = MaterialTheme.typography.titleMedium)
+            Text("Nothing here yet", color = TextSecondary, style = MaterialTheme.typography.titleMedium)
             Text(
-                "Import photos, videos or files to keep them here privately.",
+                "Make a folder or import photos, videos and files.",
                 color = TextMuted,
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(horizontal = 40.dp),
+                textAlign = TextAlign.Center,
             )
         }
     }

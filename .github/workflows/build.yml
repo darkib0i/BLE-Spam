@@ -51,9 +51,12 @@ jobs:
           name: Video Downloader (latest debug build)
           body: |
             Auto-built debug APK of Video Downloader.
-            Install on Android: enable "install unknown apps", then open the .apk.
+
+            **Install on Android:** tap `app-debug.apk` below, then when the
+            browser warns about the file type, choose "Download anyway", and
+            open it. Enable "install unknown apps" for your browser if asked.
           files: app/build/outputs/apk/debug/*.apk
-          prerelease: true
+          prerelease: false
           make_latest: "true"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
