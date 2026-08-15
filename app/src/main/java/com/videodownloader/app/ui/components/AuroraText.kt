@@ -13,7 +13,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.material3.Text
-import com.videodownloader.app.ui.theme.NeonSweep
+import com.videodownloader.app.ui.theme.TitleSweep
 
 /**
  * Text whose fill is a neon gradient that slides horizontally forever,
@@ -39,7 +39,7 @@ fun AuroraText(
     val span = 900f
     val start = -span + shift * span * 2f
     val brush = Brush.linearGradient(
-        colors = NeonSweep,
+        colors = TitleSweep,
         start = Offset(start, 0f),
         end = Offset(start + span, 0f),
     )

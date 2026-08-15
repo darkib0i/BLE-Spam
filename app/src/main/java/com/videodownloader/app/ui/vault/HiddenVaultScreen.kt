@@ -31,9 +31,11 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.Backspace
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CreateNewFolder
@@ -88,6 +90,14 @@ fun HiddenVaultScreen(
     modifier: Modifier = Modifier,
     viewModel: VaultViewModel = viewModel(),
 ) {
+    // PIN gate: the vault contents stay hidden until the code is entered.
+    // Using remember (not saveable) so it re-locks every time it's reopened.
+    var authed by remember { mutableStateOf(false) }
+    if (!authed) {
+        PinGate(onSuccess = { authed = true }, onClose = onClose, modifier = modifier)
+        return
+    }
+
     val state by viewModel.state.collectAsStateWithLifecycle()
     var viewing by remember { mutableStateOf<VaultEntry?>(null) }
     var pendingDelete by remember { mutableStateOf<VaultEntry?>(null) }
@@ -233,6 +243,112 @@ fun HiddenVaultScreen(
                 TextButton(onClick = { pendingDelete = null }) { Text("Cancel", color = TextSecondary) }
             },
         )
+    }
+}
+
+@Composable
+private fun PinGate(onSuccess: () -> Unit, onClose: () -> Unit, modifier: Modifier = Modifier) {
+    val correct = "4855"
+    var pin by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf(false) }
+
+    Box(
+        modifier
+            .fillMaxSize()
+            .background(Night)
+            .statusBarsPadding()
+            .navigationBarsPadding(),
+    ) {
+        IconButton(onClick = onClose, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
+            Icon(Icons.Rounded.Close, "Close", tint = TextSecondary)
+        }
+        Column(
+            Modifier.fillMaxSize().padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Icon(Icons.Rounded.Lock, null, tint = Cyan, modifier = Modifier.size(40.dp))
+            Spacer(Modifier.height(12.dp))
+            Text("Enter PIN", color = TextPrimary, style = MaterialTheme.typography.titleLarge)
+            Spacer(Modifier.height(18.dp))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                repeat(4) { i ->
+                    val filled = i < pin.length
+                    Box(
+                        Modifier
+                            .size(16.dp)
+                            .clip(CircleShape)
+                            .background(
+                                when {
+                                    error -> Pink
+                                    filled -> Color.White
+                                    else -> Color.White.copy(alpha = 0.2f)
+                                },
+                            ),
+                    )
+                }
+            }
+            if (error) {
+                Spacer(Modifier.height(8.dp))
+                Text("Wrong PIN", color = Pink, style = MaterialTheme.typography.bodySmall)
+            }
+
+            Spacer(Modifier.height(28.dp))
+
+            val rows = listOf(
+                listOf("1", "2", "3"),
+                listOf("4", "5", "6"),
+                listOf("7", "8", "9"),
+                listOf("", "0", "⌫"),
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                rows.forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                        row.forEach { key ->
+                            PinKey(key) {
+                                error = false
+                                when (key) {
+                                    "" -> Unit
+                                    "⌫" -> if (pin.isNotEmpty()) pin = pin.dropLast(1)
+                                    else -> if (pin.length < 4) {
+                                        pin += key
+                                        if (pin.length == 4) {
+                                            if (pin == correct) onSuccess() else {
+                                                error = true
+                                                pin = ""
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PinKey(label: String, onClick: () -> Unit) {
+    if (label.isEmpty()) {
+        Box(Modifier.size(68.dp))
+        return
+    }
+    Box(
+        Modifier
+            .size(68.dp)
+            .clip(CircleShape)
+            .background(Color.White.copy(alpha = 0.06f))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (label == "⌫") {
+            Icon(Icons.AutoMirrored.Rounded.Backspace, "delete", tint = TextPrimary, modifier = Modifier.size(24.dp))
+        } else {
+            Text(label, color = TextPrimary, style = MaterialTheme.typography.titleLarge)
+        }
     }
 }
 

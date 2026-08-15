@@ -15,28 +15,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.BlendMode
-import com.videodownloader.app.ui.theme.Cyan
-import com.videodownloader.app.ui.theme.Magenta
 import com.videodownloader.app.ui.theme.Night
-import com.videodownloader.app.ui.theme.Pink
-import com.videodownloader.app.ui.theme.Violet
 import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * A living aurora backdrop: several oversized neon blobs drift on independent
- * sine paths and additively blend, so the whole screen breathes and shifts
- * colour without ever repeating exactly. Pure Compose/Canvas — no assets.
+ * A cheap, smooth backdrop: two soft grey glows drift slowly over a black
+ * base. Only two radial-gradient draws per frame with normal blending — light
+ * enough to stay at 60fps on low-end devices (the previous four-blob additive
+ * version was the main source of jank).
  */
 @Composable
 fun AnimatedGradientBackground(modifier: Modifier = Modifier) {
-    val t = rememberInfiniteTransition(label = "aurora")
+    val t = rememberInfiniteTransition(label = "bg")
     val phase by t.animateFloat(
         initialValue = 0f,
         targetValue = (2f * Math.PI).toFloat(),
         animationSpec = infiniteRepeatable(
-            animation = tween(18_000, easing = LinearEasing),
+            animation = tween(22_000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart,
         ),
         label = "phase",
@@ -49,39 +45,25 @@ fun AnimatedGradientBackground(modifier: Modifier = Modifier) {
     ) {
         val w = size.width
         val h = size.height
-        val r = maxOf(w, h) * 0.85f
+        val r = maxOf(w, h) * 0.75f
+        val glow = Color(0xFF3A3A3A)
 
-        data class Blob(val color: Color, val cx: Float, val cy: Float, val sx: Float, val sy: Float, val speed: Float)
-
-        val blobs = listOf(
-            Blob(Violet, 0.25f, 0.20f, 0.22f, 0.16f, 1.0f),
-            Blob(Magenta, 0.80f, 0.30f, 0.18f, 0.20f, 1.4f),
-            Blob(Cyan, 0.30f, 0.82f, 0.20f, 0.14f, 0.8f),
-            Blob(Pink, 0.75f, 0.78f, 0.16f, 0.18f, 1.7f),
+        val c1 = Offset((0.30f + 0.14f * cos(phase)) * w, (0.24f + 0.10f * sin(phase)) * h)
+        drawCircle(
+            brush = Brush.radialGradient(
+                listOf(glow.copy(alpha = 0.55f), Color.Transparent),
+                center = c1, radius = r,
+            ),
+            radius = r, center = c1,
         )
 
-        blobs.forEach { b ->
-            val x = (b.cx + b.sx * cos(phase * b.speed)) * w
-            val y = (b.cy + b.sy * sin(phase * b.speed * 1.3f)) * h
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(b.color.copy(alpha = 0.55f), Color.Transparent),
-                    center = Offset(x, y),
-                    radius = r,
-                ),
-                radius = r,
-                center = Offset(x, y),
-                blendMode = BlendMode.Plus,
-            )
-        }
-
-        // Darken the edges to keep foreground text readable (vignette).
-        drawRect(
+        val c2 = Offset((0.74f + 0.12f * cos(phase * 1.2f + 2f)) * w, (0.78f + 0.10f * sin(phase * 1.1f)) * h)
+        drawCircle(
             brush = Brush.radialGradient(
-                colors = listOf(Color.Transparent, Night.copy(alpha = 0.65f)),
-                center = Offset(w * 0.5f, h * 0.42f),
-                radius = maxOf(w, h) * 0.75f,
+                listOf(glow.copy(alpha = 0.40f), Color.Transparent),
+                center = c2, radius = r,
             ),
+            radius = r, center = c2,
         )
     }
 }
