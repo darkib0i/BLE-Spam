@@ -1,6 +1,7 @@
 package com.videodownloader.app.ui
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -22,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -37,6 +39,7 @@ import com.videodownloader.app.ui.components.BottomTab
 import com.videodownloader.app.ui.home.DownloadViewModel
 import com.videodownloader.app.ui.home.HomeScreen
 import com.videodownloader.app.ui.library.LibraryScreen
+import com.videodownloader.app.ui.vault.HiddenVaultScreen
 
 @Composable
 fun AppRoot(initialUrl: String?) {
@@ -48,6 +51,7 @@ fun AppRoot(initialUrl: String?) {
     }
 
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    var showVault by rememberSaveable { mutableStateOf(false) }
     val tabs = remember {
         listOf(
             BottomTab("Download", Icons.Rounded.Download),
@@ -85,6 +89,7 @@ fun AppRoot(initialUrl: String?) {
                         onCancel = viewModel::cancel,
                         onReset = viewModel::reset,
                         onClearUrl = viewModel::clearUrl,
+                        onOpenVault = { showVault = true },
                     )
                     1 -> LibraryScreen(files = state.library, onRefresh = viewModel::refreshLibrary)
                     else -> AboutScreen()
@@ -101,5 +106,14 @@ fun AppRoot(initialUrl: String?) {
                 .navigationBarsPadding()
                 .padding(horizontal = 20.dp, vertical = 16.dp),
         )
+
+        // Hidden vault sits above the whole app when unlocked.
+        AnimatedVisibility(
+            visible = showVault,
+            enter = fadeIn(tween(250)),
+            exit = fadeOut(tween(200)),
+        ) {
+            HiddenVaultScreen(onClose = { showVault = false })
+        }
     }
 }

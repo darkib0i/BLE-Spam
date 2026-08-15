@@ -19,10 +19,10 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
 
-        // The bundled binaries only ship for these ABIs. Filtering keeps the
-        // APK from advertising unsupported architectures.
+        // Ship only the ARM ABIs real phones use; dropping x86_64 (emulators)
+        // roughly halves the APK, which matters given the bundled yt-dlp/ffmpeg.
         ndk {
-            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64")
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a")
         }
     }
 

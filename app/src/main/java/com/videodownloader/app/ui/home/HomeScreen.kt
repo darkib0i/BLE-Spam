@@ -54,6 +54,7 @@ import com.videodownloader.app.ui.components.GlassCard
 import com.videodownloader.app.ui.components.GradientButton
 import com.videodownloader.app.ui.components.ProgressRing
 import com.videodownloader.app.ui.components.QualitySelector
+import com.videodownloader.app.ui.components.SecretSearchBar
 import com.videodownloader.app.ui.components.SuccessBurst
 import com.videodownloader.app.ui.theme.Cyan
 import com.videodownloader.app.ui.theme.Lime
@@ -73,6 +74,7 @@ fun HomeScreen(
     onCancel: () -> Unit,
     onReset: () -> Unit,
     onClearUrl: () -> Unit,
+    onOpenVault: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val clipboard = LocalClipboardManager.current
@@ -88,7 +90,18 @@ fun HomeScreen(
             .padding(horizontal = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(8.dp))
+
+        // Looks like a plain search bar (top-right). It's the hidden entrance:
+        // ten quick taps open the private vault, with no visible hint.
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            SecretSearchBar(
+                onUnlock = onOpenVault,
+                modifier = Modifier.fillMaxWidth(0.6f),
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
 
         AnimatedVisibility(
             visible = entered,

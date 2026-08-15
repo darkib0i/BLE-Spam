@@ -4,4 +4,6 @@
          finished downloads are written. -->
     <external-files-path name="downloads" path="Movies/" />
     <external-files-path name="audio" path="Music/" />
+    <!-- The private in-app vault (internal storage). -->
+    <files-path name="vault" path="vault/" />
 </paths>
