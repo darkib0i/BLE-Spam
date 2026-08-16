@@ -2,7 +2,6 @@ package com.videodownloader.app.ui.vault
 
 import android.graphics.Bitmap
 import android.net.Uri
-import android.widget.MediaController
 import android.widget.VideoView
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -31,6 +30,8 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.pager.VerticalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -98,14 +99,19 @@ fun HiddenVaultScreen(
         return
     }
 
+    val context = LocalContext.current
     val state by viewModel.state.collectAsStateWithLifecycle()
-    var viewing by remember { mutableStateOf<VaultEntry?>(null) }
+    // The swipeable viewer pages through images + videos of the current folder.
+    val mediaEntries = remember(state.entries) {
+        state.entries.filter { it.kind == VaultEntry.Kind.IMAGE || it.kind == VaultEntry.Kind.VIDEO }
+    }
+    var pagerIndex by remember { mutableStateOf<Int?>(null) }
     var pendingDelete by remember { mutableStateOf<VaultEntry?>(null) }
     var showNewFolder by remember { mutableStateOf(false) }
 
     BackHandler {
         when {
-            viewing != null -> viewing = null
+            pagerIndex != null -> pagerIndex = null
             !state.atRoot -> viewModel.goUp()
             else -> onClose()
         }
@@ -194,7 +200,14 @@ fun HiddenVaultScreen(
                         VaultCell(
                             entry = entry,
                             onOpen = {
-                                if (entry.isFolder) viewModel.openFolder(entry.file) else viewing = entry
+                                when {
+                                    entry.isFolder -> viewModel.openFolder(entry.file)
+                                    entry.kind == VaultEntry.Kind.IMAGE || entry.kind == VaultEntry.Kind.VIDEO -> {
+                                        val idx = mediaEntries.indexOfFirst { it.file == entry.file }
+                                        if (idx >= 0) pagerIndex = idx
+                                    }
+                                    else -> openFile(context, entry.file)
+                                }
                             },
                             onDelete = { pendingDelete = entry },
                         )
@@ -203,9 +216,19 @@ fun HiddenVaultScreen(
             }
         }
 
-        // Full-screen viewer.
-        AnimatedVisibility(visible = viewing != null, enter = fadeIn(), exit = fadeOut()) {
-            viewing?.let { entry -> VaultViewer(entry = entry, onClose = { viewing = null }) }
+        // Full-screen, swipeable (TikTok-style) media viewer.
+        AnimatedVisibility(visible = pagerIndex != null, enter = fadeIn(), exit = fadeOut()) {
+            pagerIndex?.let { start ->
+                VaultPager(
+                    entries = mediaEntries,
+                    startIndex = start,
+                    onClose = { pagerIndex = null },
+                    onDelete = { entry ->
+                        pagerIndex = null
+                        pendingDelete = entry
+                    },
+                )
+            }
         }
     }
 
@@ -452,65 +475,98 @@ private fun VaultCell(entry: VaultEntry, onOpen: () -> Unit, onDelete: () -> Uni
 }
 
 @Composable
-private fun VaultViewer(entry: VaultEntry, onClose: () -> Unit) {
-    val context = LocalContext.current
+private fun VaultPager(
+    entries: List<VaultEntry>,
+    startIndex: Int,
+    onClose: () -> Unit,
+    onDelete: (VaultEntry) -> Unit,
+) {
+    if (entries.isEmpty()) return
+    val pagerState = rememberPagerState(
+        initialPage = startIndex.coerceIn(0, entries.lastIndex),
+    ) { entries.size }
+
     Box(
         Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.96f))
+            .background(Color.Black)
             .statusBarsPadding()
             .navigationBarsPadding(),
     ) {
-        when (entry.kind) {
-            VaultEntry.Kind.IMAGE -> {
-                val bmp by produceState<Bitmap?>(initialValue = null, entry) {
-                    value = VaultManager.thumbnail(entry, targetPx = 1600)
-                }
-                bmp?.let {
-                    Image(
-                        bitmap = it.asImageBitmap(),
-                        contentDescription = entry.name,
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier.fillMaxSize().padding(12.dp),
-                    )
-                }
-            }
-            VaultEntry.Kind.VIDEO -> {
-                AndroidView(
-                    modifier = Modifier.fillMaxSize().padding(8.dp),
-                    factory = { ctx ->
-                        VideoView(ctx).apply {
-                            setVideoURI(Uri.fromFile(entry.file))
-                            val controller = MediaController(ctx)
-                            controller.setAnchorView(this)
-                            setMediaController(controller)
-                            setOnPreparedListener { mp -> mp.isLooping = true; start() }
-                        }
-                    },
-                )
-            }
-            else -> {
-                Column(
-                    Modifier.fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    Icon(Icons.Rounded.InsertDriveFile, null, tint = TextSecondary, modifier = Modifier.size(72.dp))
-                    Spacer(Modifier.height(12.dp))
-                    Text(entry.name, color = TextPrimary, overflow = TextOverflow.Ellipsis)
-                    Spacer(Modifier.height(16.dp))
-                    ActionButton("Open externally", Icons.Rounded.Add) { openFile(context, entry.file) }
+        VerticalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+            val entry = entries[page]
+            val active = pagerState.currentPage == page
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                if (entry.kind == VaultEntry.Kind.VIDEO) {
+                    PagerVideo(entry = entry, active = active)
+                } else {
+                    val bmp by produceState<Bitmap?>(initialValue = null, entry) {
+                        value = VaultManager.thumbnail(entry, targetPx = 1600)
+                    }
+                    bmp?.let {
+                        Image(
+                            bitmap = it.asImageBitmap(),
+                            contentDescription = entry.name,
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 }
             }
         }
 
-        IconButton(
-            onClick = onClose,
-            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
+        val current = entries.getOrNull(pagerState.currentPage)
+
+        // Top overlay: close, name, delete.
+        Row(
+            Modifier.fillMaxWidth().align(Alignment.TopCenter).padding(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Rounded.Close, "Close", tint = Color.White, modifier = Modifier.size(28.dp))
+            IconButton(onClick = onClose) { Icon(Icons.Rounded.Close, "Close", tint = Color.White) }
+            Text(
+                current?.name.orEmpty(),
+                color = Color.White,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).padding(horizontal = 6.dp),
+            )
+            IconButton(onClick = { current?.let(onDelete) }) {
+                Icon(Icons.Rounded.Delete, "Delete", tint = Color.White)
+            }
         }
+
+        Text(
+            "${pagerState.currentPage + 1} / ${entries.size}   ·   swipe",
+            color = Color.White.copy(alpha = 0.65f),
+            style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
+        )
     }
+}
+
+@Composable
+private fun PagerVideo(entry: VaultEntry, active: Boolean) {
+    AndroidView(
+        modifier = Modifier.fillMaxSize(),
+        factory = { ctx ->
+            VideoView(ctx).apply {
+                setVideoURI(Uri.fromFile(entry.file))
+                setOnPreparedListener { mp ->
+                    mp.isLooping = true
+                    if (active) start()
+                }
+            }
+        },
+        update = { view ->
+            if (active) {
+                if (!view.isPlaying) view.start()
+            } else if (view.isPlaying) {
+                view.pause()
+                view.seekTo(0)
+            }
+        },
+    )
 }
 
 @Composable

@@ -4,6 +4,10 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+// Each CI build gets a higher versionCode (from the workflow run number) so
+// Android treats the new APK as an update; local builds default to 1.
+val buildVersionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
+
 android {
     namespace = "com.videodownloader.app"
     compileSdk = 35
@@ -13,8 +17,8 @@ android {
         // yt-dlp / python bundle from youtubedl-android needs API 24+.
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = buildVersionCode
+        versionName = "1.0.$buildVersionCode"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
@@ -23,6 +27,18 @@ android {
         // roughly halves the APK, which matters given the bundled yt-dlp/ffmpeg.
         ndk {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a")
+        }
+    }
+
+    // A committed, stable debug key so every build (local or CI) is signed
+    // identically — that's what lets a new APK install *over* the old one
+    // instead of Android rejecting it as a conflicting package.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
         }
     }
 
