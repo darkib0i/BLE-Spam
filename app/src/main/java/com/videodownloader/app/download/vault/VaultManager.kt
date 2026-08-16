@@ -33,8 +33,30 @@ data class VaultEntry(
  */
 object VaultManager {
 
-    fun rootDir(context: Context): File =
-        File(context.filesDir, "vault").apply { mkdirs() }
+    /**
+     * The vault root. [decoy] selects a completely separate, initially-empty
+     * store — the fake vault shown when the decoy PIN is entered.
+     */
+    fun rootDir(context: Context, decoy: Boolean = false): File =
+        File(context.filesDir, if (decoy) "vault_decoy" else "vault").apply { mkdirs() }
+
+    /** All images/videos under [root], recursively — used by the timeline feed. */
+    fun listAllMedia(root: File): List<VaultEntry> {
+        val out = ArrayList<VaultEntry>()
+        val stack = ArrayDeque<File>()
+        stack.addLast(root)
+        while (stack.isNotEmpty()) {
+            stack.removeLast().listFiles()?.forEach { f ->
+                if (f.isDirectory) {
+                    stack.addLast(f)
+                } else {
+                    val e = f.toEntry()
+                    if (e.kind == VaultEntry.Kind.IMAGE || e.kind == VaultEntry.Kind.VIDEO) out += e
+                }
+            }
+        }
+        return out.sortedByDescending { it.lastModified }
+    }
 
     fun list(dir: File): List<VaultEntry> =
         dir.listFiles()

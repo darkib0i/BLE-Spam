@@ -47,8 +47,11 @@ import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.InsertDriveFile
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.PlayCircle
+import androidx.compose.material.icons.rounded.Slideshow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -75,9 +78,22 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.videodownloader.app.download.share.openFile
+import com.videodownloader.app.download.vault.LikeStore
 import com.videodownloader.app.download.vault.VaultEntry
 import com.videodownloader.app.download.vault.VaultManager
 import com.videodownloader.app.ui.theme.Cyan
@@ -98,7 +114,14 @@ fun HiddenVaultScreen(
     // Using remember (not saveable) so it re-locks every time it's reopened.
     var authed by remember { mutableStateOf(false) }
     if (!authed) {
-        PinGate(onSuccess = { authed = true }, onClose = onClose, modifier = modifier)
+        PinGate(
+            onSuccess = { decoy ->
+                viewModel.openVault(decoy)
+                authed = true
+            },
+            onClose = onClose,
+            modifier = modifier,
+        )
         return
     }
 
@@ -112,9 +135,12 @@ fun HiddenVaultScreen(
     var pendingDelete by remember { mutableStateOf<VaultEntry?>(null) }
     var renaming by remember { mutableStateOf<VaultEntry?>(null) }
     var showNewFolder by remember { mutableStateOf(false) }
+    var showTimeline by remember { mutableStateOf(false) }
+    var timelineLikedOnly by remember { mutableStateOf(false) }
 
     BackHandler {
         when {
+            showTimeline -> showTimeline = false
             pagerIndex != null -> pagerIndex = null
             !state.atRoot -> viewModel.goUp()
             else -> onClose()
@@ -162,6 +188,12 @@ fun HiddenVaultScreen(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f).padding(start = 4.dp),
                 )
+                IconButton(onClick = {
+                    timelineLikedOnly = false
+                    showTimeline = true
+                }) {
+                    Icon(Icons.Rounded.Slideshow, "Timeline", tint = Cyan)
+                }
                 IconButton(onClick = onClose) {
                     Icon(Icons.Rounded.Close, "Close", tint = TextSecondary)
                 }
@@ -228,7 +260,7 @@ fun HiddenVaultScreen(
             }
         }
 
-        // Full-screen, swipeable (TikTok-style) media viewer.
+        // Full-screen, swipeable (TikTok-style) media viewer for the folder.
         AnimatedVisibility(visible = pagerIndex != null, enter = fadeIn(), exit = fadeOut()) {
             pagerIndex?.let { start ->
                 VaultPager(
@@ -240,6 +272,51 @@ fun HiddenVaultScreen(
                         pendingDelete = entry
                     },
                 )
+            }
+        }
+
+        // Timeline: a feed of ALL media in the vault (recursively), TikTok-style.
+        AnimatedVisibility(visible = showTimeline, enter = fadeIn(), exit = fadeOut()) {
+            val timelineMedia by produceState(
+                initialValue = emptyList<VaultEntry>(),
+                showTimeline, timelineLikedOnly, state.entries,
+            ) {
+                value = withContext(Dispatchers.IO) {
+                    val all = VaultManager.listAllMedia(viewModel.currentRootDir())
+                    if (timelineLikedOnly) {
+                        all.filter { LikeStore.isLiked(context, it.file.absolutePath) }
+                    } else {
+                        all
+                    }
+                }
+            }
+
+            if (timelineMedia.isEmpty()) {
+                Box(
+                    Modifier.fillMaxSize().background(Color.Black).statusBarsPadding(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    IconButton(
+                        onClick = { showTimeline = false },
+                        modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
+                    ) { Icon(Icons.Rounded.Close, "Close", tint = Color.White) }
+                    Text(
+                        if (timelineLikedOnly) "No liked items yet" else "No photos or videos yet",
+                        color = TextSecondary,
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
+            } else {
+                key(timelineLikedOnly) {
+                    VaultPager(
+                        entries = timelineMedia,
+                        startIndex = 0,
+                        onClose = { showTimeline = false },
+                        onDelete = { entry -> pendingDelete = entry },
+                        likedFilterActive = timelineLikedOnly,
+                        onToggleLikedFilter = { timelineLikedOnly = !timelineLikedOnly },
+                    )
+                }
             }
         }
     }
@@ -294,8 +371,14 @@ fun HiddenVaultScreen(
 }
 
 @Composable
-private fun PinGate(onSuccess: () -> Unit, onClose: () -> Unit, modifier: Modifier = Modifier) {
-    val correct = "4855"
+private fun PinGate(
+    onSuccess: (decoy: Boolean) -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    // Real PIN opens the real vault; the decoy PIN opens a separate empty one.
+    val realPin = "4855"
+    val decoyPin = "4845"
     var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf(false) }
 
@@ -361,9 +444,13 @@ private fun PinGate(onSuccess: () -> Unit, onClose: () -> Unit, modifier: Modifi
                                     else -> if (pin.length < 4) {
                                         pin += key
                                         if (pin.length == 4) {
-                                            if (pin == correct) onSuccess() else {
-                                                error = true
-                                                pin = ""
+                                            when (pin) {
+                                                realPin -> onSuccess(false)
+                                                decoyPin -> onSuccess(true)
+                                                else -> {
+                                                    error = true
+                                                    pin = ""
+                                                }
                                             }
                                         }
                                     }
@@ -522,11 +609,25 @@ private fun VaultPager(
     startIndex: Int,
     onClose: () -> Unit,
     onDelete: (VaultEntry) -> Unit,
+    likedFilterActive: Boolean = false,
+    onToggleLikedFilter: (() -> Unit)? = null,
 ) {
     if (entries.isEmpty()) return
+    val context = LocalContext.current
     val pagerState = rememberPagerState(
         initialPage = startIndex.coerceIn(0, entries.lastIndex),
     ) { entries.size }
+
+    // Local like cache (falls back to persisted store), plus a double-tap burst.
+    val likeState = remember { mutableStateMapOf<String, Boolean>() }
+    fun liked(e: VaultEntry) = likeState[e.file.absolutePath] ?: LikeStore.isLiked(context, e.file.absolutePath)
+    fun toggleLike(e: VaultEntry) {
+        val next = !liked(e)
+        likeState[e.file.absolutePath] = next
+        LikeStore.setLiked(context, e.file.absolutePath, next)
+    }
+
+    var burstAt by remember { mutableStateOf(0L) }
 
     Box(
         Modifier
@@ -538,7 +639,19 @@ private fun VaultPager(
         VerticalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
             val entry = entries[page]
             val active = pagerState.currentPage == page
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .pointerInput(entry) {
+                        detectTapGestures(
+                            onDoubleTap = {
+                                if (!liked(entry)) toggleLike(entry)
+                                burstAt = System.currentTimeMillis()
+                            },
+                        )
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
                 if (entry.kind == VaultEntry.Kind.VIDEO) {
                     PagerVideo(entry = entry, active = active)
                 } else {
@@ -559,7 +672,10 @@ private fun VaultPager(
 
         val current = entries.getOrNull(pagerState.currentPage)
 
-        // Top overlay: close, name, delete.
+        // Double-tap heart burst.
+        HeartBurst(trigger = burstAt)
+
+        // Top overlay: close, name, optional liked-filter, delete.
         Row(
             Modifier.fillMaxWidth().align(Alignment.TopCenter).padding(6.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -573,8 +689,40 @@ private fun VaultPager(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f).padding(horizontal = 6.dp),
             )
+            if (onToggleLikedFilter != null) {
+                IconButton(onClick = onToggleLikedFilter) {
+                    Icon(
+                        if (likedFilterActive) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                        "Liked only",
+                        tint = Color.White,
+                    )
+                }
+            }
             IconButton(onClick = { current?.let(onDelete) }) {
                 Icon(Icons.Rounded.Delete, "Delete", tint = Color.White)
+            }
+        }
+
+        // Right-side like button (TikTok-style).
+        current?.let { entry ->
+            val isLiked = liked(entry)
+            Column(
+                Modifier.align(Alignment.CenterEnd).padding(end = 10.dp, bottom = 40.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                IconButton(onClick = { toggleLike(entry) }) {
+                    Icon(
+                        if (isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                        contentDescription = "Like",
+                        tint = Color.White,
+                        modifier = Modifier.size(36.dp),
+                    )
+                }
+                Text(
+                    if (isLiked) "Liked" else "Like",
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelSmall,
+                )
             }
         }
 
@@ -583,6 +731,29 @@ private fun VaultPager(
             color = Color.White.copy(alpha = 0.65f),
             style = MaterialTheme.typography.labelSmall,
             modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
+        )
+    }
+}
+
+/** A big heart that pops and fades on a double-tap like. */
+@Composable
+private fun HeartBurst(trigger: Long) {
+    if (trigger == 0L) return
+    val scale = remember(trigger) { Animatable(0.5f) }
+    val alpha = remember(trigger) { Animatable(0.95f) }
+    LaunchedEffect(trigger) {
+        launch { scale.animateTo(1.35f, tween(450)) }
+        alpha.animateTo(0f, tween(750))
+    }
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Icon(
+            Icons.Rounded.Favorite,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier
+                .size(130.dp)
+                .scale(scale.value)
+                .graphicsLayer { this.alpha = alpha.value },
         )
     }
 }

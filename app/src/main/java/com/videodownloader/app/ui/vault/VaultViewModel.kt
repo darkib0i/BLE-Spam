@@ -23,7 +23,7 @@ data class VaultUiState(
 
 class VaultViewModel(app: Application) : AndroidViewModel(app) {
 
-    private val root: File = VaultManager.rootDir(app)
+    private var root: File = VaultManager.rootDir(app, decoy = false)
     private var currentDir: File = root
 
     private val _state = MutableStateFlow(stateFor(root))
@@ -32,6 +32,15 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
     init {
         refresh()
     }
+
+    /** Switches to the real or decoy store after the PIN is entered. */
+    fun openVault(decoy: Boolean) {
+        root = VaultManager.rootDir(getApplication(), decoy)
+        currentDir = root
+        refresh()
+    }
+
+    fun currentRootDir(): File = root
 
     fun refresh() {
         viewModelScope.launch { emitCurrent() }
