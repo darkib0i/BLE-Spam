@@ -49,7 +49,9 @@ import androidx.compose.material.icons.rounded.InsertDriveFile
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PhotoLibrary
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.Slideshow
 import androidx.compose.material3.AlertDialog
@@ -58,6 +60,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -84,12 +88,14 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.videodownloader.app.download.share.openFile
@@ -760,26 +766,111 @@ private fun HeartBurst(trigger: Long) {
 
 @Composable
 private fun PagerVideo(entry: VaultEntry, active: Boolean) {
-    AndroidView(
-        modifier = Modifier.fillMaxSize(),
-        factory = { ctx ->
-            VideoView(ctx).apply {
-                setVideoURI(Uri.fromFile(entry.file))
-                setOnPreparedListener { mp ->
-                    mp.isLooping = true
-                    if (active) start()
+    val videoRef = remember { mutableStateOf<VideoView?>(null) }
+    var duration by remember(entry) { mutableIntStateOf(0) }
+    var position by remember(entry) { mutableIntStateOf(0) }
+    var dragging by remember(entry) { mutableStateOf(false) }
+    var isPlaying by remember(entry) { mutableStateOf(true) }
+
+    Box(Modifier.fillMaxSize()) {
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = { ctx ->
+                VideoView(ctx).apply {
+                    videoRef.value = this
+                    setVideoURI(Uri.fromFile(entry.file))
+                    setOnPreparedListener { mp ->
+                        mp.isLooping = true
+                        duration = duration.coerceAtLeast(this.duration)
+                        if (active && isPlaying) start()
+                    }
                 }
+            },
+            update = { view ->
+                videoRef.value = view
+                if (active) {
+                    if (isPlaying && !view.isPlaying) view.start()
+                    if (!isPlaying && view.isPlaying) view.pause()
+                } else if (view.isPlaying) {
+                    view.pause()
+                }
+            },
+        )
+
+        // Poll playback position while this page is on screen.
+        LaunchedEffect(active, entry) {
+            while (active) {
+                val v = videoRef.value
+                if (v != null) {
+                    if (duration <= 0 && v.duration > 0) duration = v.duration
+                    if (!dragging) position = v.currentPosition
+                }
+                delay(300)
             }
-        },
-        update = { view ->
-            if (active) {
-                if (!view.isPlaying) view.start()
-            } else if (view.isPlaying) {
-                view.pause()
-                view.seekTo(0)
+        }
+
+        if (active) {
+            Row(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 44.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = {
+                    val v = videoRef.value ?: return@IconButton
+                    if (v.isPlaying) {
+                        v.pause(); isPlaying = false
+                    } else {
+                        v.start(); isPlaying = true
+                    }
+                }) {
+                    Icon(
+                        if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                        contentDescription = if (isPlaying) "Pause" else "Play",
+                        tint = Color.White,
+                    )
+                }
+                Text(
+                    formatTime(position),
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelSmall,
+                )
+                Slider(
+                    value = position.toFloat().coerceIn(0f, duration.coerceAtLeast(1).toFloat()),
+                    onValueChange = {
+                        dragging = true
+                        position = it.toInt()
+                    },
+                    onValueChangeFinished = {
+                        videoRef.value?.seekTo(position)
+                        dragging = false
+                    },
+                    valueRange = 0f..duration.coerceAtLeast(1).toFloat(),
+                    modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                    colors = SliderDefaults.colors(
+                        thumbColor = Color.White,
+                        activeTrackColor = Color.White,
+                        inactiveTrackColor = Color.White.copy(alpha = 0.3f),
+                    ),
+                )
+                Text(
+                    formatTime(duration),
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelSmall,
+                )
             }
-        },
-    )
+        }
+    }
+}
+
+private fun formatTime(ms: Int): String {
+    if (ms <= 0) return "0:00"
+    val totalSec = ms / 1000
+    val h = totalSec / 3600
+    val m = (totalSec % 3600) / 60
+    val s = totalSec % 60
+    return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
 }
 
 @Composable
