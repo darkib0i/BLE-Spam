@@ -74,6 +74,22 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
         refresh()
     }
 
+    fun rename(entry: VaultEntry, newName: String) {
+        if (newName.isBlank()) return
+        VaultManager.rename(entry, newName)
+        refresh()
+    }
+
+    fun importTree(treeUri: Uri) {
+        val dir = currentDir
+        viewModelScope.launch {
+            _state.update { it.copy(importing = true) }
+            VaultManager.importTree(getApplication(), treeUri, dir)
+            _state.update { it.copy(importing = false) }
+            emitCurrent()
+        }
+    }
+
     private fun emitCurrent() {
         _state.value = stateFor(currentDir).copy(importing = _state.value.importing)
     }

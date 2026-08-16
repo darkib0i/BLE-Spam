@@ -41,6 +41,9 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CreateNewFolder
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.DriveFileRenameOutline
+import androidx.compose.material.icons.rounded.DriveFolderUpload
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.InsertDriveFile
 import androidx.compose.material.icons.rounded.Lock
@@ -107,6 +110,7 @@ fun HiddenVaultScreen(
     }
     var pagerIndex by remember { mutableStateOf<Int?>(null) }
     var pendingDelete by remember { mutableStateOf<VaultEntry?>(null) }
+    var renaming by remember { mutableStateOf<VaultEntry?>(null) }
     var showNewFolder by remember { mutableStateOf(false) }
 
     BackHandler {
@@ -124,6 +128,10 @@ fun HiddenVaultScreen(
     val filePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenMultipleDocuments(),
     ) { uris -> viewModel.importAll(uris) }
+
+    val folderPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree(),
+    ) { uri -> uri?.let { viewModel.importTree(it) } }
 
     Box(
         modifier
@@ -181,7 +189,10 @@ fun HiddenVaultScreen(
                 ActionButton("Files", Icons.Rounded.Add, Modifier.weight(1f)) {
                     filePicker.launch(arrayOf("*/*"))
                 }
-                ActionButton("Folder", Icons.Rounded.CreateNewFolder, Modifier.weight(1f)) {
+                ActionButton("Folder", Icons.Rounded.DriveFolderUpload, Modifier.weight(1f)) {
+                    folderPicker.launch(null)
+                }
+                ActionButton("New", Icons.Rounded.CreateNewFolder, Modifier.weight(1f)) {
                     showNewFolder = true
                 }
             }
@@ -209,6 +220,7 @@ fun HiddenVaultScreen(
                                     else -> openFile(context, entry.file)
                                 }
                             },
+                            onRename = { renaming = entry },
                             onDelete = { pendingDelete = entry },
                         )
                     }
@@ -240,6 +252,18 @@ fun HiddenVaultScreen(
                 showNewFolder = false
             },
             onDismiss = { showNewFolder = false },
+        )
+    }
+
+    // Rename dialog.
+    renaming?.let { entry ->
+        RenameDialog(
+            entry = entry,
+            onConfirm = { name ->
+                viewModel.rename(entry, name)
+                renaming = null
+            },
+            onDismiss = { renaming = null },
         )
     }
 
@@ -396,7 +420,12 @@ private fun ActionButton(
 }
 
 @Composable
-private fun VaultCell(entry: VaultEntry, onOpen: () -> Unit, onDelete: () -> Unit) {
+private fun VaultCell(
+    entry: VaultEntry,
+    onOpen: () -> Unit,
+    onRename: () -> Unit,
+    onDelete: () -> Unit,
+) {
     Box(
         Modifier
             .aspectRatio(1f)
@@ -457,6 +486,19 @@ private fun VaultCell(entry: VaultEntry, onOpen: () -> Unit, onDelete: () -> Uni
                     )
                 }
             }
+        }
+
+        // Rename affordance.
+        Box(
+            Modifier
+                .align(Alignment.TopStart)
+                .padding(4.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color.Black.copy(alpha = 0.45f))
+                .clickable(onClick = onRename)
+                .padding(4.dp),
+        ) {
+            Icon(Icons.Rounded.Edit, "Rename", tint = Color.White, modifier = Modifier.size(18.dp))
         }
 
         // Delete affordance.
@@ -595,6 +637,43 @@ private fun NewFolderDialog(onConfirm: (String) -> Unit, onDismiss: () -> Unit) 
                 onClick = { onConfirm(name.trim()) },
                 enabled = name.isNotBlank(),
             ) { Text("Create", color = Cyan) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel", color = TextSecondary) }
+        },
+    )
+}
+
+@Composable
+private fun RenameDialog(
+    entry: VaultEntry,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var name by remember { mutableStateOf(entry.name) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Rounded.DriveFileRenameOutline, null, tint = Cyan) },
+        title = { Text(if (entry.isFolder) "Rename folder" else "Rename file") },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                singleLine = true,
+                placeholder = { Text("Name", color = TextMuted) },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Cyan,
+                    unfocusedBorderColor = TextMuted,
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary,
+                    cursorColor = Cyan,
+                ),
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(name.trim()) }, enabled = name.isNotBlank()) {
+                Text("Rename", color = Cyan)
+            }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel", color = TextSecondary) }

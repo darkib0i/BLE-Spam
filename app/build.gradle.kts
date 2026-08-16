@@ -106,6 +106,9 @@ dependencies {
     // Async
     implementation(libs.kotlinx.coroutines.android)
 
+    // Recursive folder import from a picked directory tree (SAF).
+    implementation(libs.androidx.documentfile)
+
     // yt-dlp download engine (library + ffmpeg for merging + aria2c for speed)
     implementation(libs.youtubedl.library)
     implementation(libs.youtubedl.ffmpeg)

@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.OpenableColumns
+import androidx.documentfile.provider.DocumentFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -76,6 +77,55 @@ object VaultManager {
 
     fun delete(entry: VaultEntry): Boolean =
         if (entry.isFolder) entry.file.deleteRecursively() else entry.file.delete()
+
+    /** Renames a file or folder. Files keep their original extension. */
+    fun rename(entry: VaultEntry, newName: String): Boolean {
+        val parent = entry.file.parentFile ?: return false
+        val base = sanitize(newName)
+        val targetName = if (entry.isFolder) {
+            base
+        } else {
+            val ext = entry.file.extension
+            if (ext.isNotEmpty() && !base.endsWith(".$ext", ignoreCase = true)) "$base.$ext" else base
+        }
+        val target = uniqueFile(parent, targetName)
+        return entry.file.renameTo(target)
+    }
+
+    /**
+     * Recursively copies a picked folder tree into [destDir], recreating any
+     * sub-folders. Returns the number of files imported.
+     */
+    suspend fun importTree(context: Context, treeUri: Uri, destDir: File): Int =
+        withContext(Dispatchers.IO) {
+            val root = DocumentFile.fromTreeUri(context, treeUri) ?: return@withContext 0
+            var count = 0
+            val stack = ArrayDeque<Pair<DocumentFile, File>>()
+            stack.addLast(root to destDir)
+            while (stack.isNotEmpty()) {
+                val (doc, target) = stack.removeLast()
+                doc.listFiles().forEach { child ->
+                    if (child.isDirectory) {
+                        val sub = uniqueFile(target, sanitize(child.name ?: "folder"))
+                        sub.mkdirs()
+                        stack.addLast(child to sub)
+                    } else {
+                        val name = ensureExtension(
+                            sanitize(child.name ?: "file_${System.currentTimeMillis()}"),
+                            child.type,
+                        )
+                        val out = uniqueFile(target, name)
+                        val ok = runCatching {
+                            context.contentResolver.openInputStream(child.uri)?.use { input ->
+                                out.outputStream().use { output -> input.copyTo(output) }
+                            } != null
+                        }.getOrDefault(false)
+                        if (ok && out.length() > 0) count++ else out.delete()
+                    }
+                }
+            }
+            count
+        }
 
     /** Decodes a thumbnail for a file entry (down-sampled image or video frame). */
     suspend fun thumbnail(entry: VaultEntry, targetPx: Int = 300): Bitmap? =
