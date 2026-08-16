@@ -46,8 +46,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.videodownloader.app.download.DownloadStatus
-import com.videodownloader.app.download.share.openFile
-import com.videodownloader.app.download.share.shareFile
+import com.videodownloader.app.download.share.openUri
+import com.videodownloader.app.download.share.shareUri
 import com.videodownloader.app.ui.components.AnimatedPercentage
 import com.videodownloader.app.ui.components.AuroraText
 import com.videodownloader.app.ui.components.GlassCard
@@ -195,8 +195,8 @@ fun HomeScreen(
                 is DownloadStatus.Downloading -> DownloadingAction(status, onCancel)
                 is DownloadStatus.Success -> SuccessAction(
                     fileName = status.file.name,
-                    onOpen = { openFile(context, status.file.file) },
-                    onShare = { shareFile(context, status.file.file) },
+                    onOpen = { openUri(context, status.file.uri, status.file.isAudio) },
+                    onShare = { shareUri(context, status.file.uri, status.file.isAudio) },
                     onAnother = onReset,
                 )
             }
@@ -290,7 +290,7 @@ private fun SuccessAction(
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         SuccessBurst()
-        Text("Saved to your library", color = Lime, style = MaterialTheme.typography.titleMedium)
+        Text("Saved to your gallery", color = Lime, style = MaterialTheme.typography.titleMedium)
         Text(
             fileName,
             color = TextSecondary,

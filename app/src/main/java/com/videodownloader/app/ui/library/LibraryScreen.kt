@@ -44,8 +44,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.videodownloader.app.download.DownloadedFile
-import com.videodownloader.app.download.share.openFile
-import com.videodownloader.app.download.share.shareFile
+import com.videodownloader.app.download.share.openUri
+import com.videodownloader.app.download.share.shareUri
 import com.videodownloader.app.ui.components.AuroraText
 import com.videodownloader.app.ui.components.GlassCard
 import com.videodownloader.app.ui.theme.Cyan
@@ -81,11 +81,11 @@ fun LibraryScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(bottom = 120.dp),
             ) {
-                items(files, key = { it.file.absolutePath }) { file ->
+                items(files, key = { it.uri.toString() }) { file ->
                     LibraryRow(
                         file = file,
-                        onOpen = { openFile(context, file.file) },
-                        onShare = { shareFile(context, file.file) },
+                        onOpen = { openUri(context, file.uri, file.isAudio) },
+                        onShare = { shareUri(context, file.uri, file.isAudio) },
                     )
                 }
             }

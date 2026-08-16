@@ -1,6 +1,6 @@
 package com.videodownloader.app.download
 
-import java.io.File
+import android.net.Uri
 
 /**
  * Quality presets exposed in the UI. Each maps to a yt-dlp format selector.
@@ -14,12 +14,15 @@ enum class Quality(val label: String, val tagline: String) {
     AUDIO("Audio", "MP3 only");
 }
 
-/** A file that finished downloading, shown in the Library tab. */
+/**
+ * A finished download. It lives in the shared media store (so it shows up in
+ * the phone's Gallery), addressed by a content [uri].
+ */
 data class DownloadedFile(
-    val file: File,
+    val uri: Uri,
     val name: String,
     val sizeBytes: Long,
-    val lastModified: Long,
+    val dateAddedMs: Long,
     val isAudio: Boolean,
 )
 
